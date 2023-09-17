@@ -1,0 +1,15 @@
+def view_profile(connection, user_id, username, email):  # Menambahkan email sebagai argumen
+    user_info = get_user_info(connection, username)
+    if user_info:
+        stored_user_id, stored_username, stored_password, stored_registration_date, stored_email = user_info  # Mengambil user_id, username, password, registration_date, dan email dari data pengguna
+        clear_screen()
+        display_logo()
+        print(Fore.GREEN + "Profil Pengguna:")
+        print(Fore.YELLOW + f"Nomor Seri: {stored_user_id}")  # Menampilkan Nomor Seri (user_id)
+        print(Fore.YELLOW + f"Username: {stored_username}")
+        print(Fore.YELLOW + f"Password: {stored_password}")
+        print(Fore.YELLOW + f"Email: {stored_email}")  # Menampilkan email
+        print(Fore.YELLOW + f"Tanggal Pendaftaran: {stored_registration_date}")
+    else:
+        display_message("Pengguna tidak ditemukan.")
+    input("Tekan Enter untuk kembali ke menu utama...")
