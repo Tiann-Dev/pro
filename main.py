@@ -413,21 +413,21 @@ def send_message(connection, sender_username):
         console.print("[red]Username penerima tidak ditemukan.")
         input("Tekan Enter untuk kembali ke menu chat...")
 
-def send_message(connection, sender_username):
-    clear_screen()
-    display_logo()
-    receiver_username = input(Fore.YELLOW + "Masukkan username penerima: ")
+def send_chat_message(connection, sender_username, receiver_username, message):
+    cursor = connection.cursor()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        cursor.execute("INSERT INTO chat_messages (sender_username, receiver_username, message_text, timestamp) VALUES (?, ?, ?, ?)",
+                       (sender_username, receiver_username, message, timestamp))
+        connection.commit()
+        return True
+    except Exception as e:
+        print("Error:", e)
+        return False
 
-    if not is_username_unique(connection, receiver_username):
-        message_text = input(Fore.YELLOW + "Ketik pesan Anda: ")
-        if send_chat_message(connection, sender_username, receiver_username, message_text):
-            console.print("[green]Pesan telah terkirim!")
-        else:
-            console.print("[red]Gagal mengirim pesan. Mohon coba lagi.")
-        input("Tekan Enter untuk kembali ke menu chat...")
-    else:
-        console.print("[red]Username penerima tidak ditemukan.")
-        input("Tekan Enter untuk kembali ke menu chat...")
+
+
 
 if __name__ == "__main__":
     init(autoreset=True)

@@ -53,6 +53,16 @@ def create_tables(connection):
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_username TEXT,
+            receiver_username TEXT,
+            message TEXT,
+            message_text TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
 
     connection.commit()
 
@@ -305,21 +315,17 @@ def get_chat_messages(connection, sender_username, receiver_username):
 
 def send_chat_message(connection, sender_username, receiver_username, message):
     cursor = connection.cursor()
-    sender_id = get_user_id(connection, sender_username)
-    receiver_id = get_user_id(connection, receiver_username)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    if sender_id and receiver_id:
-        cursor.execute("INSERT INTO chat_messages (sender_id, receiver_id, sender_username, receiver_username, message, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-                       (sender_id, receiver_id, sender_username, receiver_username, message, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        connection.commit()
-        return True
-    else:
-        return False
+    cursor.execute("INSERT INTO chat_messages (sender_username, receiver_username, message, timestamp) VALUES (?, ?, ?, ?)",
+                   (sender_username, receiver_username, message, timestamp))
+    connection.commit()
+
 
 def get_received_messages(connection, receiver_username):
     cursor = connection.cursor()
     cursor.execute("""
-        SELECT sender_username, message, timestamp
+        SELECT sender_username, message_text, timestamp
         FROM chat_messages
         WHERE receiver_username = ?
         ORDER BY timestamp ASC
