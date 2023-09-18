@@ -1,4 +1,3 @@
-
 from rich import print
 from rich.console import Console
 from rich import color
@@ -66,28 +65,6 @@ def is_administrator(connection, username):
     result = cursor.fetchone()
     return result and result[0] == 1
 
-def admin_menu(connection):
-    if username == "tian":
-        while True:
-            clear_screen()
-            display_logo()
-            console.print("[green]Menu Admin:[/green]")
-            console.print("[yellow]===================================")
-            console.print("[yellow]1. Upgrade Pengguna ke Premium")
-            console.print("[yellow]2. Kembali ke Menu Utama")
-            console.print("[yellow]===================================")
-            admin_choice = get_choice()
-
-            if admin_choice == "1":
-                api_key = input("Masukkan API Key untuk pengguna yang ingin diupgrade: ")
-                premium_duration = int(input("Masukkan durasi premium (dalam hari): "))
-                admin.upgrade_user_to_premium(connection, api_key, premium_duration)
-                input("Tekan Enter untuk kembali ke menu Admin...")
-            elif admin_choice == "2":
-                main_menu(connection, username, session_token)
-
-
-
 def is_user_exists(connection, username):
     # Check if the user exists in the database
     cursor = connection.cursor()
@@ -101,39 +78,6 @@ def is_user_premium(connection, username):
     cursor.execute("SELECT is_premium FROM users WHERE username = ?", (username,))
     result = cursor.fetchone()
     return result and result[0] == 1
-
-def admin_upgrade_to_premium(connection, admin_username, target_username):
-    # Check if the admin user is indeed an administrator
-    if not is_administrator(connection, admin_username):
-        console.print("[bold red]Anda tidak memiliki hak administrator.[/bold red]")
-        input("Tekan Enter untuk kembali ke menu utama...")
-        return
-
-    # Check if the target user exists
-    if not is_user_exists(connection, target_username):
-        console.print("[bold red]Pengguna dengan nama ini tidak ditemukan.[/bold red]")
-        input("Tekan Enter untuk kembali ke menu utama...")
-        return
-
-    # Check if the target user is already premium
-    if is_user_premium(connection, target_username):
-        console.print("[bold red]Pengguna ini sudah merupakan pengguna premium.[/bold red]")
-        input("Tekan Enter untuk kembali ke menu utama...")
-        return
-
-    # Generate a new API key
-    api_key = generate_api_key()
-
-    # Upgrade the target user to premium and store the API key
-    user_id = get_user_id(connection, target_username)  # Implement get_user_id function
-    cursor = connection.cursor()
-    cursor.execute("UPDATE users SET is_premium = 1 WHERE id = ?", (user_id,))
-    connection.commit()
-    store_api_key(user_id, api_key)
-
-    console.print("[bold green]Upgrade berhasil![/bold green]")
-    console.print(f"[yellow]API Key baru untuk pengguna {target_username}:[/yellow] {api_key}")
-    input("Tekan Enter untuk kembali ke menu utama...")
 
 def logout(connection, session_token):
     cursor = connection.cursor()
@@ -275,7 +219,7 @@ def main_menu(connection, username, session_token):
                 break
         elif choice == "admin":
             if username == "tian":
-                admin_menu(connection)  # Memanggil menu admin jika username adalah "tian"
+                admin.admin_menu(connection)  # Memanggil menu admin jika username adalah "tian"
             else:
                 display_message("Anda bukan admin.")
         else:
@@ -297,14 +241,9 @@ def handle_login(connection):
 
                 if is_account_locked(connection, username):
                     console.print("[red]Akun Anda telah terkunci. Silakan hubungi administrator.")
-                    break
+                    input("Tekan Enter untuk kembali ke menu utama...")
 
-                if login_attempts >= 3:
-                    # Implementasi penundaan setelah 3 kali percobaan login gagal
-                    console.print("[red]Anda telah melebihi jumlah maksimal percobaan login.")
-                    lock_account(connection, username)
-                    time.sleep(10)  # Penundaan selama 10 detik
-                    login_attempts = 0  # Reset percobaan login
+                    username = None
 
                 password = input_password()
 
@@ -319,7 +258,13 @@ def handle_login(connection):
                     return username, session_token  # Kembalikan username dan session_token saat login berhasil
                 else:
                     login_attempts += 1
-                    console.print("[red]Login gagal. Username atau password salah.")
+                    if login_attempts >= 3:
+                        console.print("[red]Anda telah melebihi jumlah maksimal percobaan login.")
+                        lock_account(connection, username)
+                        time.sleep(10)  # Penundaan selama 10 detik
+                        login_attempts = 0  # Reset percobaan login
+                    else:
+                        console.print("[red]Login gagal. Username atau password salah.")
                     input("Tekan Enter untuk kembali ke menu utama...")
                     username = None
             else:
@@ -334,7 +279,6 @@ def handle_login(connection):
                 registration_result = register(connection, username, password)
 
                 if registration_result is True:
-                    api_key = registration_result
                     console.print("[green]Registrasi berhasil! Silakan login.")
                     input("Tekan Enter untuk kembali ke menu utama...")
                 else:
@@ -344,9 +288,9 @@ def handle_login(connection):
             else:
                 console.print("[red]Anda sudah masuk. Logout terlebih dahulu untuk mendaftar.")
                 input("Tekan Enter untuk kembali ke menu utama...")
-
         elif choice == "3":
             break
+
 
 def inbox_menu(connection, username):
     console = Console()
@@ -444,6 +388,6 @@ if __name__ == "__main__":
 
         if username:
             if is_administrator(connection, username):
-                admin_menu(connection)
+                admin.admin_menu(connection)
             else:
                 main_menu(connection, username, session_token)

@@ -200,25 +200,19 @@ def lock_account(connection, username):
     cursor.execute("UPDATE users SET is_locked = 1 WHERE username = ?", (username,))
     connection.commit()
 
-def is_account_locked(connection, username):
-    cursor = connection.cursor()
-    cursor.execute("SELECT is_locked FROM users WHERE username = ?", (username,))
-    result = cursor.fetchone()
-    
-    if result is not None:
-        locked = result[0]
-        print(f"Account locked status for {username}: {locked}")
-        return locked == 1
-    else:
-        print(f"No account found with username: {username}")
-        return False
-
-
-
 def unlock_account(connection, username):
     cursor = connection.cursor()
     cursor.execute("UPDATE users SET is_locked = 0 WHERE username = ?", (username,))
     connection.commit()
+
+def is_account_locked(connection, username):
+    cursor = connection.cursor()
+    cursor.execute("SELECT is_locked FROM users WHERE username = ?", (username,))
+    result = cursor.fetchone()
+    if result and result[0] == 1:
+        return True
+    else:
+        return False
 
 def validate_password(connection, username, password):
     cursor = connection.cursor()
