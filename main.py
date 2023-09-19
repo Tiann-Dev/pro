@@ -1,17 +1,21 @@
 from rich import print
 from rich.console import Console
 from rich import color
+from rich.table import Table
 from rich.panel import Panel
 from colorama import Fore, Style, init
 import secrets
-import admin
-
+import emoji
+import subprocess
+import importlib
+from rich.text import Text
 
 import sqlite3
-import os
+import os,re
 import random
 import string
-import time
+import time,sys
+import admin
 from datetime import datetime, timedelta
 from database import (
     create_connection,
@@ -36,8 +40,12 @@ from database import (
     is_username_unique,
     store_api_key,
     create_admin_account,
-    upgrade_user_to_premium
+    upgrade_user_to_premium,
+    update_email
+
 )
+
+
 
 # Initialize colorama
 init(autoreset=True)
@@ -110,42 +118,55 @@ def is_session_valid(connection, session_token):
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
-
 def display_logo():
     console.print(
         """
-   _____ _             ____                 _ 
-  / ____| |           / __ \               | |
- | |    | |__   __ _| |  | |_   _  ___  __| |
- | |    | '_ \ / _` | |  | | | | |/ _ \/ _` |
- | |____| | | | (_| | |__| | |_| |  __/ (_| |
-  \_____|_| |_|\__,_|\____/ \__, |\___|\__,_|
-                            __/ |           
-                           |___/            
-""",
-        style="cyan",
+⠀⣠⣶⣿⣿⣶⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣿⣿⣿⣿⡆⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠹⢿⣿⣿⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⡏⢀⣀⡀⠀⠀⠀⠀⠀
+⠀⠀⣠⣤⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⠿⣟⣋⣼⣽⣾⣽⣦⡀⠀⠀⠀
+⢀⣼⣿⣷⣾⡽⡄⠀⠀⠀⠀⠀⠀⠀⣴⣶⣶⣿⣿⣿⡿⢿⣟⣽⣾⣿⣿⣦⠀⠀
+⣸⣿⣿⣾⣿⣿⣮⣤⣤⣤⣤⡀⠀⠀⠻⣿⡯⠽⠿⠛⠛⠉⠉⢿⣿⣿⣿⣿⣷⡀
+⣿⣿⢻⣿⣿⣿⣛⡿⠿⠟⠛⠁⣀⣠⣤⣤⣶⣶⣶⣶⣷⣶⠀⠀⠻⣿⣿⣿⣿⣇
+⢻⣿⡆⢿⣿⣿⣿⣿⣤⣶⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠟⠀⣠⣶⣿⣿⣿⣿⡟
+⠈⠛⠃⠈⢿⣿⣿⣿⣿⣿⣿⠿⠟⠛⠋⠉⠁⠀⠀⠀⠀⣠⣾⣿⣿⣿⠟⠋⠁⠀
+⠀⠀⠀⠀⠀⠙⢿⣿⣿⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⣿⣿⠟⠁⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢸⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⠋⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⠁⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⣼⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠻⣿⡿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+        """
     )
 
-
 def input_username():
-    return input(Fore.YELLOW + "Username: ")
-
+    return input("👤 Username: ")
 
 def input_password():
-    return input(Fore.YELLOW + "Password: ")
+    return input("🔒 Password: ")
 
 def get_choice():
-    choice = input(Fore.YELLOW + "Pilihan Anda: ")
-    return choice.strip()  # Remove leading/trailing whitespace
+    return input("👆 Pilihan Anda: ").strip()
 
+
+console = Console()
 
 def display_menu():
-    clear_screen()
-    display_logo()
-    console.print("[green]Menu:")
-    console.print("[yellow]1. Login")
-    console.print("[yellow]2. Daftar")
-    console.print("[yellow]3. Keluar")
+    console.clear()
+    print('''    |￣￣￣￣￣￣￣￣￣￣￣￣￣￣|
+        Selamat Datang di Forum
+    |＿＿＿＿＿＿＿＿＿＿＿＿＿＿|
+                        \ (•◡•) /
+                        \       /''')
+
+    table = Table(show_header=False)
+    table.add_column("[yellow]Pilihan", justify="center", width=50)
+    table.add_row("[cyan1]1. [bold]:closed_lock_with_key: Login[/bold]")
+    table.add_row("[cyan2]2. [bold]:busts_in_silhouette: Daftar[/bold]")
+    table.add_row("[red3]3. [bold]:x: Keluar[/bold]")
+    console.print(table)
+
 
 def view_profile(connection, username, session_token):
     user_info = get_user_info(connection, username)
@@ -154,77 +175,192 @@ def view_profile(connection, username, session_token):
 
         clear_screen()
         display_logo()
-        print("[bold green]Profil Pengguna:[/bold green]")
-        print(f"[yellow]Nomor Seri:[/yellow] {stored_user_id}")
-        print(f"[yellow]Username:[/yellow] {stored_username}")
-        print(f"[yellow]Password:[/yellow] {stored_password}")
-        print(f"[yellow]Tanggal Pendaftaran:[/yellow] {stored_registration_date}")
-        print(f"[yellow]Email:[/yellow] {stored_email if stored_email else 'None'}")
-        print(f"[yellow]Status Premium:[/yellow] {'Premium' if is_premium else 'Gratis'}")
-        print(f"[yellow]Status Online:[/yellow] {'Online' if is_online else 'Offline'}")
-        print(f"[yellow]Durasi Premium:[/yellow] {premium_duration} hari")
-        print(f"[yellow]API Key:[/yellow] {api_key if api_key else 'Tidak Ada API Key'}")
+        console.print("[bold green]Profil Pengguna[/bold green] 📌")
+        console.print(f"🆔 [yellow]Nomor Seri:[/yellow] {stored_user_id}")
+        console.print(f"👤 [yellow]Username:[/yellow] {stored_username}")
+        console.print(f"🔒 [yellow]Password:[/yellow] {'*' * len(stored_password)}")
+        formatted_registration_date = datetime.strptime(stored_registration_date, "%Y-%m-%d %H:%M:%S").strftime("%d %B %Y")
+        console.print(f"📅 [yellow]Tanggal Pendaftaran:[/yellow] {formatted_registration_date}")
+        console.print(f"📧 [yellow]Email:[/yellow] {stored_email if stored_email else 'None'}")
+        console.print(f"🌟 [yellow]Status Premium:[/yellow] {'✅ Premium' if is_premium else '❌ Gratis'}")
+        console.print(f"💻 [yellow]Status Online:[/yellow] {'✅ Online' if is_online else '❌ Offline'}")
+        console.print(f"⏳ [yellow]Durasi Premium:[/yellow] {premium_duration} hari")
+        console.print(f"🔑 [yellow]API Key:[/yellow] {api_key if api_key else 'Tidak Ada API Key'}")
     else:
-        print("[bold red]Pengguna tidak ditemukan.[/bold red]")
-    input("Tekan Enter untuk kembali ke menu utama...")
+        console.print("[bold red]Pengguna tidak ditemukan.[/bold red]")
+    input("\nTekan Enter untuk kembali ke menu utama...")
 
 
 
 def change_password(connection, username):
-    new_password = input(Fore.YELLOW + "Masukkan kata sandi baru: ")
-    if update_password(connection, username, new_password):
-        console.print("[green]Kata sandi berhasil diperbarui.")
-    else:
-        console.print("[red]Gagal memperbarui kata sandi. Coba lagi.")
+    while True:
+        display_logo()
+        console.print("[green]Ubah Kata Sandi:[/green]")
+        console.print("[yellow]===================================")
 
+        # Meminta kata sandi lama dan kata sandi baru dari pengguna
+        old_password = input("Masukkan kata sandi lama: ")
+        new_password = input("Masukkan kata sandi baru: ")
+
+        # Memeriksa kata sandi lama yang sesuai
+        if validate_password(connection, username, old_password):
+            # Mengupdate kata sandi baru di database
+            if update_password(connection, username, new_password):
+                console.print("[green]Kata sandi berhasil diubah![/green]")
+                input("Tekan Enter untuk kembali ke menu utama...")
+                break
+            else:
+                display_message("Terjadi kesalahan saat mengubah kata sandi. Coba lagi.")
+        else:
+            display_message("Kata sandi lama tidak cocok. Coba lagi.")
 
 def display_message(message):
     console.print(f"[cyan]{message}")
 
+def is_valid_email(email):
+    # Periksa keberadaan karakter "@" dalam email
+    if "@" not in email:
+        return False
+
+    # Gunakan ekspresi reguler untuk memeriksa apakah email memiliki format yang benar
+    pattern = r'^\S+@\S+\.\S+$'
+    return re.match(pattern, email)
+
+# Fungsi untuk mengubah email pengguna
+def change_email(connection, username):
+    clear_screen()
+    display_logo()
+    console.print("[yellow]===================================")
+    console.print("[yellow]Ubah Alamat Email")
+    console.print("[yellow]===================================")
+
+    # Mintalah pengguna untuk memasukkan email baru
+    new_email = input("Masukkan email baru: ")
+
+    # Validasi email yang dimasukkan oleh pengguna
+    if not is_valid_email(new_email):
+        display_message("Email yang dimasukkan tidak valid. Coba lagi.")
+        input("Tekan Enter untuk melanjutkan...")
+        return
+
+    try:
+        # Perbarui alamat email dalam database
+        update_email(connection, username, new_email)
+        display_message("Alamat email berhasil diperbarui.")
+        input("Tekan Enter untuk kembali ke menu pengaturan...")
+    except Exception as e:
+        display_message(f"Terjadi kesalahan: {str(e)}")
+        input("Tekan Enter untuk kembali ke menu pengaturan...")
 
 def generate_session_token():
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(32))
 
-# ... Kode sebelumnya ...
+
+def display_statistics(connection):
+    cursor = connection.cursor()
+    
+    # Hitung total pengguna
+    cursor.execute("SELECT COUNT(*) FROM users")
+    total_users = cursor.fetchone()[0]
+
+    # Hitung total pesan dalam sistem
+    cursor.execute("SELECT COUNT(*) FROM chat_messages")
+    total_messages = cursor.fetchone()[0]
+
+    # Hitung total pengguna online
+    cursor.execute("SELECT username FROM users WHERE is_online = 1")
+    online_users = [row[0] for row in cursor.fetchall()]
+
+    clear_screen()
+    display_logo()
+    console.print("📊 [green]Statistik Aplikasi[/green] 📈")
+    console.print("📋 [yellow]===================================")
+    console.print(f"👥 [yellow]Total Pengguna: {total_users}")
+    console.print(f"💌 [yellow]Total Pesan: {total_messages}")
+    console.print(f"💻 [yellow]Total Pengguna Online: {len(online_users)}")
+    console.print("📊 [green]Statistik[/green] 📈")
+    console.print("📋 [yellow]===================================")
+    console.print("👥 [yellow]Pengguna Online[/yellow]")
+    for user in online_users:
+        console.print(f"🔵 [yellow]- {user}")
+    console.print("📋 [yellow]===================================")
+    input("Tekan Enter untuk kembali ke menu utama...")
+
+
+def settings_menu(connection, username):
+    while True:
+        clear_screen()
+        display_logo()
+        console.print("[green]Pengaturan:[/green]")
+        console.print("[yellow]===================================")
+        console.print("[yellow]1. Ubah Email ✉️")
+        console.print("[yellow]2. Ubah Kata Sandi 🔐")
+        console.print("[yellow]3. Atur Notifikasi 🔔")
+        console.print("[yellow]4. Kembali ke Menu Utama ↩️")
+        console.print("[yellow]===================================")
+        choice = get_choice()
+
+        if choice == "1":
+            change_email(connection, username)
+        elif choice == "2":
+            change_password(connection, username)  # Panggil fungsi "change_password" untuk mengubah kata sandi
+        elif choice == "3":
+            configure_notifications()
+        elif choice == "4":
+            break
+        else:
+            display_message("Pilihan tidak valid. Coba lagi.")
+
+
+def display_about_us():
+    clear_screen()
+    display_logo()
+    console.print("[bold cyan]Tentang Kami[/bold cyan]")
+    console.print("[yellow]===================================")
+    console.print("👋 Selamat datang di Aplikasi Kami!")
+    console.print("🚀 Versi Aplikasi: 1.0")
+    console.print("✉️ Hubungi Kami: haha@gacorkang.my.id")
+    console.print("ℹ️ Aplikasi ini dibuat untuk tujuan demonstrasi dan pembelajaran.")
+    console.print("🌐 Kunjungi situs web kami: https://gacorkang.my.id")
+    console.print("[yellow]===================================")
+    input("Tekan Enter untuk kembali ke Menu Tambahan...")
+
+
 
 def main_menu(connection, username, session_token):
     while True:
         clear_screen()
         display_logo()
-        console.print("[green]Menu Utama:[/green]")
+        console.print("[bold green]Menu Utama[/bold green]")
         console.print("[yellow]===================================")
-        console.print("[yellow]1. Lihat Profil")
-        console.print("[yellow]2. Ubah Kata Sandi")
-        console.print("[yellow]3. Chat")
-        console.print("[yellow]4. Keluar")
+        console.print("[yellow]1. Lihat Profil [/yellow](👤)")
+        console.print("[yellow]2. Chat [/yellow](💬)")
+        console.print("[yellow]3. Statistik [/yellow](📊)")
+        console.print("[yellow]4. Pengaturan [/yellow](⚙️)")
+        console.print("[yellow]5. Tentang Kami [/yellow](ℹ️)")
+        console.print("[yellow]6. Keluar [/yellow](🚪)")
         console.print("[yellow]===================================")
         choice = get_choice()
+
 
         if choice == "1":
             view_profile(connection, username, session_token)
         elif choice == "2":
-            change_password(connection, username)
-            username, session_token = logout(connection, session_token)
-            if username is None:
-                display_message("Logout berhasil!")
-                input("Tekan Enter untuk kembali ke menu utama...")
-                break
+            chat_menu(connection, username)
         elif choice == "3":
-            inbox_menu(connection, username)
+            display_statistics(connection)
         elif choice == "4":
+            settings_menu(connection, username)  # Panggil submenu pengaturan
+        elif choice == "5":
+            display_about_us()
+        elif choice == "6":
             username, session_token = logout(connection, session_token)
             if username is None:
                 display_message("Logout berhasil!")
                 input("Tekan Enter untuk kembali ke menu utama...")
                 break
-        elif choice == "admin":
-            if username == "tian":
-                admin.admin_menu(connection)  # Memanggil menu admin jika username adalah "tian"
-            else:
-                display_message("Anda bukan admin.")
         else:
             display_message("Pilihan tidak valid. Coba lagi.")
-
 
 def handle_login(connection):
     login_attempts = 0
@@ -292,24 +428,30 @@ def handle_login(connection):
             break
 
 
-def inbox_menu(connection, username):
-    console = Console()
-
+def chat_menu(connection, username):
     while True:
         clear_screen()
-        console.print(Panel("[bold green]Chat Menu[/bold green]", style="white on blue"))
-        console.print("[yellow]1. Lihat Pesan")
-        console.print("[yellow]2. Kirim Pesan")
-        console.print("[yellow]3. Kembali ke Menu Utama")
+        display_logo()
+        console.print("[bold cyan]🗨️ Menu Obrolan 🗨️[/bold cyan]")
+        console.print("[yellow]===================================")
+        console.print("[cyan]1. 📩 Mulai Obrolan[/cyan]")
+        console.print("[cyan]2. 📥 Lihat Pesan[/cyan]")
+        console.print("[cyan]3. ✉️ Kirim Pesan[/cyan]")
+        console.print("[red]4. 🚪 Keluar[/red]")
+        console.print("[yellow]===================================")
         choice = get_choice()
 
         if choice == "1":
-            display_received_messages(connection, username)
-            input("Tekan Enter untuk kembali ke menu chat...")
+            start_chat(connection, username)
         elif choice == "2":
-            send_message(connection, username)
+            view_messages(connection, username)
         elif choice == "3":
+            send_message(connection, username)
+        elif choice == "4":
             break
+        else:
+            display_message("Pilihan tidak valid. Coba lagi.")
+
 
 def display_received_messages(connection, username):
     messages = get_received_messages(connection, username)
@@ -370,10 +512,36 @@ def send_chat_message(connection, sender_username, receiver_username, message):
         print("Error:", e)
         return False
 
+def check_required_modules():
+    required_modules = [
+        "rich", "colorama", "secrets", "emoji", "sqlite3", "os", "re", "random",
+        "string", "time", "datetime","rich","rich.table",
+        "rich.panel",
+        "secrets", "emoji", "rich.text"
+    ]
+
+    missing_modules = []
+
+    for module_name in required_modules:
+        try:
+            importlib.import_module(module_name)
+        except ImportError:
+            missing_modules.append(module_name)
+
+    return missing_modules
+
+def install_missing_modules(missing_modules):
+    if missing_modules:
+        for module_name in missing_modules:
+            try:
+                subprocess.run(["python3","-m", "pip", "install", module_name], check=True)
+                print(f"Modul {module_name} telah diinstal.")
+            except subprocess.CalledProcessError:
+                print(f"Gagal menginstal modul {module_name}.")
 
 
-
-if __name__ == "__main__":
+def run_program():
+    # Program utama Anda di sini
     init(autoreset=True)
     console = Console()
 
@@ -391,3 +559,18 @@ if __name__ == "__main__":
                 admin.admin_menu(connection)
             else:
                 main_menu(connection, username, session_token)
+
+def main():
+    missing_modules = check_required_modules()
+
+    if missing_modules:
+        print("Modul-modul berikut belum terinstal:")
+        for module in missing_modules:
+            print(module)
+        print("Menginstal modul-modul yang dibutuhkan...")
+        install_missing_modules(missing_modules)
+    else:
+        run_program()
+
+if __name__ == "__main__":
+    main()

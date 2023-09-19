@@ -2,8 +2,6 @@ import sqlite3
 from datetime import datetime, timedelta
 import secrets
 
-
-
 def create_connection():
     conn = None
     try:
@@ -331,3 +329,13 @@ def create_admin_account(connection, username, password):
     cursor = connection.cursor()
     cursor.execute("INSERT INTO users (username, password, registration_date, is_premium, api_key, premium_duration) VALUES (?, ?, datetime('now'), 1, 'T_Admin', 30)", (username, password))
     connection.commit()
+
+def update_email(connection, username, new_email):
+    cursor = connection.cursor()
+    try:
+        cursor.execute("UPDATE users SET email = ? WHERE username = ?", (new_email, username))
+        connection.commit()
+        return True
+    except sqlite3.Error as e:
+        print("Error updating email:", e)
+        return False
