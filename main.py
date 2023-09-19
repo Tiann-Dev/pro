@@ -514,10 +514,7 @@ def send_chat_message(connection, sender_username, receiver_username, message):
 
 def check_required_modules():
     required_modules = [
-        "rich", "colorama", "secrets", "emoji", "sqlite3", "os", "re", "random",
-        "string", "time", "datetime","rich","rich.table",
-        "rich.panel",
-        "secrets", "emoji", "rich.text"
+        "rich", "colorama", "secrets", "emoji", "sqlite3", "os", "re", "random","string", "time", "datetime","rich","rich.table","rich.panel","secrets", "emoji", "rich.text"
     ]
 
     missing_modules = []
