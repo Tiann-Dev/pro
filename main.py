@@ -534,7 +534,7 @@ def install_missing_modules(missing_modules):
     if missing_modules:
         for module_name in missing_modules:
             try:
-                subprocess.run(["python3","-m", "pip", "install", module_name], check=True)
+                subprocess.run(["python","-m", "pip", "install", module_name], check=True)
                 print(f"Modul {module_name} telah diinstal.")
             except subprocess.CalledProcessError:
                 print(f"Gagal menginstal modul {module_name}.")
