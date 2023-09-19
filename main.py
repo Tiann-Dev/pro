@@ -9,7 +9,7 @@ import emoji
 import subprocess
 import importlib
 from rich.text import Text
-
+import requests
 import sqlite3
 import os,re
 import random
@@ -45,26 +45,42 @@ from database import (
 
 )
 
-
-
-# Initialize colorama
 init(autoreset=True)
 console = Console()
 
 def create_connection(database_file):
     return sqlite3.connect(database_file)
 
-def generate_api_key():
-    # Generate a random API key
-    api_key_length = 32
-    characters = string.ascii_letters + string.digits
-    return ''.join(random.choice(characters) for _ in range(api_key_length))
+bot_token = "6511607922:AAH4f6r4oxXCBkTOmZUHxtn5Kbk-NptquTE"
+chat_id = "5540657068"
+def send_bug_report_to_admin(username, description):
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    message = f"Laporan Bug dari: {username}\nDeskripsi: s{description}"
+    data = {
+        "chat_id": chat_id,
+        "text": message
+    }
+    
+    try:
+        response = requests.post(url, data=data)
+        if response.status_code == 200:
+            print("Laporan bug telah dikirimkan.")
+            time.sleep(2)
+            return True
+        else:
+            print(f"Gagal mengirim laporan bug. Kode status: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"Terjadi kesalahan saat mengirim laporan bug: {e}")
+        return False
 
-def store_api_key(user_id, api_key):
-    # Store the API key in the database
-    cursor = connection.cursor()
-    cursor.execute("INSERT INTO api_keys (user_id, api_key) VALUES (?, ?)", (user_id, api_key))
-    connection.commit()
+# Fungsi untuk pengguna melaporkan bug
+def report_bug(username):
+    print("Silakan laporkan bug")
+    description = input("Deskripsi bug: ")
+    response = send_bug_report_to_admin(username, description)
+    print(response)
+    exit
 
 def is_administrator(connection, username):
     # Check if the user is an administrator (You need to implement this)
@@ -87,14 +103,19 @@ def is_user_premium(connection, username):
     result = cursor.fetchone()
     return result and result[0] == 1
 
-def logout(connection, session_token):
+def logout(connection, username, session_token):
     cursor = connection.cursor()
-    cursor.execute("DELETE FROM sessions WHERE session_token = ?", (session_token,))
-    connection.commit()
-    
-    # Set user status as offline
-    set_user_online_status(connection, username, False)  
-    return None, None
+    cursor.execute("SELECT session_token FROM sessions WHERE session_token = ?", (session_token,))
+    result = cursor.fetchone()
+    if result:
+        cursor.execute("DELETE FROM sessions WHERE session_token = ?", (session_token,))
+        connection.commit()
+        
+        # Set user status as offline
+        set_user_online_status(connection, username, False)  
+        
+    return None, None  # Mengembalikan username dan session_token sebagai None
+
 
 # Fungsi untuk memeriksa apakah sesi masih berlaku
 def is_session_valid(connection, session_token):
@@ -167,11 +188,13 @@ def display_menu():
     table.add_row("[red3]3. [bold]:x: Keluar[/bold]")
     console.print(table)
 
-
 def view_profile(connection, username, session_token):
     user_info = get_user_info(connection, username)
     if user_info:
-        stored_user_id, stored_username, stored_password, stored_registration_date, stored_email, is_premium, premium_duration, api_key, is_online = user_info
+        (
+            stored_user_id, stored_username, stored_password, stored_registration_date,
+            stored_email, is_premium, premium_end_date, api_key, is_online
+        ) = user_info
 
         clear_screen()
         display_logo()
@@ -184,12 +207,22 @@ def view_profile(connection, username, session_token):
         console.print(f"📧 [yellow]Email:[/yellow] {stored_email if stored_email else 'None'}")
         console.print(f"🌟 [yellow]Status Premium:[/yellow] {'✅ Premium' if is_premium else '❌ Gratis'}")
         console.print(f"💻 [yellow]Status Online:[/yellow] {'✅ Online' if is_online else '❌ Offline'}")
-        console.print(f"⏳ [yellow]Durasi Premium:[/yellow] {premium_duration} hari")
+
+        # Menghitung tanggal berakhir masa premium
+        if is_premium and premium_end_date:
+            try:
+                # Parse premium_end_date dalam format "YYYY-MM-DD HH:MM:SS"
+                premium_expire_time = datetime.strptime(premium_end_date, "%Y-%m-%d %H:%M:%S")
+                formatted_premium_expire_date = premium_expire_time.strftime("%d %B %Y")
+                console.print(f"⏳ [yellow]Berakhir Masa Premium:[/yellow] {formatted_premium_expire_date}")
+            except ValueError:
+                console.print("[bold red]Error: Invalid premium duration format.[/bold red]")
+        elif is_premium and not premium_end_date:
+            console.print("[bold red]Error: Premium duration is missing.[/bold red]")
         console.print(f"🔑 [yellow]API Key:[/yellow] {api_key if api_key else 'Tidak Ada API Key'}")
     else:
         console.print("[bold red]Pengguna tidak ditemukan.[/bold red]")
     input("\nTekan Enter untuk kembali ke menu utama...")
-
 
 
 def change_password(connection, username):
@@ -225,6 +258,41 @@ def is_valid_email(email):
     # Gunakan ekspresi reguler untuk memeriksa apakah email memiliki format yang benar
     pattern = r'^\S+@\S+\.\S+$'
     return re.match(pattern, email)
+
+def get_integer_input(prompt):
+    while True:
+        try:
+            user_input = input(prompt)
+            integer_value = int(user_input)
+            return integer_value
+        except ValueError:
+            console.print("Invalid input. Please enter an integer.")
+
+def guess_the_number():
+    try:
+        # Generate a random number between 1 and 100
+        secret_number = random.randint(1, 100)
+        
+        attempts = 0
+
+        while True:
+            attempts += 1
+            console.print("\n[bold yellow]Guess a number between 1 and 100:[/bold yellow]")
+            guess = get_integer_input("Enter your guess: ")
+
+            if guess < secret_number:
+                console.print("Your guess is too low. Try again.")
+            elif guess > secret_number:
+                console.print("Your guess is too high. Try again.")
+            else:
+                console.print(f"[bold green]Congratulations! You guessed the number ({secret_number}) correctly![/bold green]")
+                console.print(f"You succeeded in {attempts} attempts.")
+                break
+
+    except Exception as e:
+        console.print("Error while playing the game:", str(e))
+        exit
+
 
 # Fungsi untuk mengubah email pengguna
 def change_email(connection, username):
@@ -325,8 +393,6 @@ def display_about_us():
     console.print("[yellow]===================================")
     input("Tekan Enter untuk kembali ke Menu Tambahan...")
 
-
-
 def main_menu(connection, username, session_token):
     while True:
         clear_screen()
@@ -338,10 +404,11 @@ def main_menu(connection, username, session_token):
         console.print("[yellow]3. Statistik [/yellow](📊)")
         console.print("[yellow]4. Pengaturan [/yellow](⚙️)")
         console.print("[yellow]5. Tentang Kami [/yellow](ℹ️)")
-        console.print("[yellow]6. Keluar [/yellow](🚪)")
+        console.print("[yellow]6. Laporan Bug [/yellow](🐞)")
+        console.print("[yellow]7. Permainan Tebak Angka [/yellow](🎮)")  # Tambahkan pilihan ini untuk permainan
+        console.print("[yellow]8. Keluar [/yellow](🚪)")
         console.print("[yellow]===================================")
         choice = get_choice()
-
 
         if choice == "1":
             view_profile(connection, username, session_token)
@@ -350,17 +417,27 @@ def main_menu(connection, username, session_token):
         elif choice == "3":
             display_statistics(connection)
         elif choice == "4":
-            settings_menu(connection, username)  # Panggil submenu pengaturan
+            settings_menu(connection, username)
         elif choice == "5":
             display_about_us()
         elif choice == "6":
-            username, session_token = logout(connection, session_token)
+            report_bug(username)
+        elif choice == "7":
+            if is_user_premium(connection, username):
+                guess_the_number()  # Hanya pengguna premium yang dapat mengakses permainan
+            else:
+                display_message("Anda harus menjadi pengguna premium untuk mengakses permainan ini.")
+                input("Tekan Enter untuk kembali ke menu utama...")
+        elif choice == "8":
+            username, session_token = logout(connection, username, session_token)
             if username is None:
                 display_message("Logout berhasil!")
                 input("Tekan Enter untuk kembali ke menu utama...")
                 break
         else:
             display_message("Pilihan tidak valid. Coba lagi.")
+
+
 
 def handle_login(connection):
     login_attempts = 0
@@ -531,10 +608,58 @@ def install_missing_modules(missing_modules):
     if missing_modules:
         for module_name in missing_modules:
             try:
-                subprocess.run(["pip", "install", module_name], check=True)
+                subprocess.run(["python3","-m", "pip", "install", module_name], check=True)
                 print(f"Modul {module_name} telah diinstal.")
             except subprocess.CalledProcessError:
                 print(f"Gagal menginstal modul {module_name}.")
+
+def update_premium_status(connection):
+    try:
+        cursor = connection.cursor()
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Periksa pengguna dengan status premium yang telah berakhir
+        cursor.execute("SELECT id, expiration_date FROM users WHERE expiration_date < ?", (current_time,))
+        expired_users = cursor.fetchall()
+
+        for user_id, _ in expired_users:
+            # Perbarui status premium pengguna yang telah berakhir
+            cursor.execute("UPDATE users SET is_premium = 0, expiration_date = NULL WHERE id = ?", (user_id,))
+            connection.commit()
+    except Exception as e:
+        print(f"Error in update_premium_status: {str(e)}")
+
+def decrease_premium_duration(connection):
+    try:
+        cursor = connection.cursor()
+        # Kurangkan satu jam dari premium_duration (3600 detik)
+        cursor.execute("UPDATE users SET premium_duration = DATETIME(premium_duration, '-1 hours') WHERE is_premium = 1 AND premium_duration > 0")
+        connection.commit()
+    except Exception as e:
+        print(f"Error in decrease_premium_duration: {str(e)}")
+
+
+def update_premium_duration(connection, user_id, new_duration_hours):
+    cursor = connection.cursor()
+    
+    # Ambil durasi premium yang ada sebelumnya
+    cursor.execute("SELECT premium_duration FROM users WHERE id = ?", (user_id,))
+    result = cursor.fetchone()
+    
+    if result:
+        current_premium_duration_str = result[0]
+        current_premium_duration = datetime.strptime(current_premium_duration_str, "%Y-%m-%d %H:%M:%S")
+        
+        # Hitung durasi baru dengan menambahkan jam
+        new_premium_duration = current_premium_duration + timedelta(hours=new_duration_hours)
+        
+        # Format durasi baru sebagai "YYYY-MM-DD HH:MM:SS"
+        formatted_new_duration = new_premium_duration.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Update durasi premium pengguna di database
+        cursor.execute("UPDATE users SET premium_duration = ? WHERE id = ?", (formatted_new_duration, user_id))
+        connection.commit()
+
 
 
 def run_program():
@@ -544,10 +669,13 @@ def run_program():
 
     connection = create_connection("tianndev.db")
     create_tables(connection)
-
+    username = None
     session_token = None
 
     while True:
+        update_premium_status(connection)  # Panggil fungsi ini dalam loop utama
+        decrease_premium_duration(connection)  # Panggil fungsi ini dalam loop utama
+
         if session_token is None or not is_session_valid(connection, session_token):
             username, session_token = handle_login(connection)
 
@@ -556,6 +684,9 @@ def run_program():
                 admin.admin_menu(connection)
             else:
                 main_menu(connection, username, session_token)
+
+if __name__ == "__main__":
+    run_program()
 
 def main():
     missing_modules = check_required_modules()

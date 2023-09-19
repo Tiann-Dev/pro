@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime, timedelta
 import secrets
+import string
 
 def create_connection():
     conn = None
@@ -27,7 +28,7 @@ def create_tables(connection):
             is_locked INTEGER DEFAULT 0,
             is_online INTEGER DEFAULT 0,
             api_key TEXT,
-            premium_duration INTEGER DEFAULT 0
+            premium_duration TEXT DEFAULT '0'
         )
     ''')
 
@@ -62,7 +63,39 @@ def create_tables(connection):
     );
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS activity_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        activity TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS BugReports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        description TEXT,
+        report_date DATETIME,
+        status TEXT
+    )
+""")
+
     connection.commit()
+
+
+def log_user_activity(user_id, activity):
+    connection = sqlite3.connect("tianndev.db")
+    cursor = connection.cursor()
+
+    # Menyisipkan log aktivitas
+    cursor.execute("INSERT INTO activity_log (user_id, activity) VALUES (?, ?)", (user_id, activity))
+
+    # Commit perubahan dan menutup koneksi
+    connection.commit()
+    connection.close()
+
 
 def get_chat_messages(connection, sender_username, receiver_username):
     cursor = connection.cursor()
@@ -86,9 +119,14 @@ def is_username_unique(connection, username):
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM users WHERE username = ?", (username,))
     return cursor.fetchone()[0] == 0
-# Function to generate a random API key
-def generate_api_key():
-    return "T_" + secrets.token_hex(14)  # Menambahkan awalan "T_" dan menghasilkan 14 karakter hexadecimal
+
+def generate_api_key(username):
+    api_key_prefix = f"{username}_"
+    remaining_length = 16 - len(api_key_prefix)
+    characters = string.ascii_letters + string.digits
+    api_key_suffix = ''.join(secrets.choice(characters) for _ in range(remaining_length))
+    api_key = api_key_prefix + api_key_suffix
+    return api_key
 
 # Function to store an API key in the database
 def store_api_key(api_key):
@@ -98,8 +136,7 @@ def store_api_key(api_key):
     connection.commit()
     connection.close()
 
-
-def register(connection, username, password):
+def register(connection, username, password, is_premium=False, premium_duration=None):
     cursor = connection.cursor()
 
     # Periksa panjang nama pengguna dan kata sandi
@@ -113,10 +150,12 @@ def register(connection, username, password):
         return "Nama pengguna sudah ada, silakan pilih yang lain."
 
     # Hasilkan API key secara otomatis
-    api_key = secrets.token_urlsafe(32)  # Menghasilkan API key sepanjang 32 karakter
+    api_key = generate_api_key(username)   # Menghasilkan API key sepanjang 32 karakter
 
-    # Tanggal kedaluwarsa untuk akun gratis (misalnya, 30 hari setelah pendaftaran)
-    expiration_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+    # Tanggal kedaluwarsa untuk akun premium
+    expiration_date = None
+    if is_premium and premium_duration is not None:
+        expiration_date = (datetime.now() + timedelta(days=premium_duration)).strftime("%Y-%m-%d %H:%M:%S")
 
     # Periksa apakah nama pengguna adalah "tian" dan tetapkan status admin jika benar
     if username.lower() == "tian":
@@ -127,12 +166,11 @@ def register(connection, username, password):
     try:
         # Sisipkan data pengguna ke database, termasuk API key dan status admin
         cursor.execute("INSERT INTO users (username, password, registration_date, is_premium, expiration_date, api_key, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       (username, password, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 0, expiration_date, api_key, is_admin))
+                       (username, password, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), is_premium, expiration_date, api_key, is_admin))
         connection.commit()
         return True
     except sqlite3.IntegrityError:
         return "Terjadi kesalahan saat mendaftar."
-
 
 def update_password(conn, username, new_password):
     cursor = conn.cursor()
@@ -232,12 +270,12 @@ def get_registration_date(connection, username):
     else:
         return None
 
-def upgrade_user_to_premium(connection, api_key, premium_duration):
+def upgrade_user_to_premium(connection, username, premium_duration):
     cursor = connection.cursor()
-
-    # Perbarui nilai is_premium dan premium_duration
-    cursor.execute("UPDATE users SET is_premium = 1, premium_duration = ? WHERE api_key = ?", (premium_duration, api_key))
+    expiration_date = (datetime.now() + timedelta(days=premium_duration)).strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("UPDATE users SET is_premium = 1, expiration_date = ? WHERE username = ?", (expiration_date, username))
     connection.commit()
+
 
 
 def set_user_online_status(connection, username, is_online):
